@@ -1,48 +1,65 @@
-const fs = require("fs");
-const dns = require("dns").promises;
-const { URL } = require("url");
+const dns = require("node:dns").promises;
 
-const URLS_FILE = "urls.txt";
+const withTimeout = (promise, ms) => {
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error("TIMEOUT")), ms),
+  );
+  return Promise.race([promise, timeout]);
+};
 
-async function main() {
-  try {
-    const data = fs.readFileSync(URLS_FILE, "utf8");
-    const urls = data
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line !== "");
+async function resolveWithPool(list, concurrency = 20) {
+  const byDomain = {};
+  const uniqueIps = new Set();
+  let currentIndex = 0;
 
-    const domains = new Set();
-    urls.forEach((rawUrl) => {
+  const worker = async () => {
+    while (currentIndex < list.length) {
+      const domain = list[currentIndex++];
+      if (!domain) continue;
+
       try {
-        const parsed = new URL(rawUrl);
-        domains.add(parsed.hostname);
-      } catch (error) {
-        console.error(`Invalid URL skipped: ${rawUrl}`);
-      }
-    });
-
-    const uniqueDomains = Array.from(domains).sort();
-    const uniqueIps = new Set();
-
-    for (const domain of uniqueDomains) {
-      try {
-        const addresses = await dns.lookup(domain, { all: true });
-        const ips = addresses.map((addr) => addr.address);
-        ips.forEach((ip) => uniqueIps.add(ip));
-        console.log(`${domain}: ${ips.join(", ")}`);
-      } catch (error) {
-        console.error(`Failed to resolve ${domain}: ${error.message}`);
+        const addresses = await withTimeout(dns.resolve4(domain), 5000);
+        byDomain[domain] = addresses;
+        addresses.forEach((ip) => uniqueIps.add(ip));
+      } catch (err) {
+        const reason = err.message === "TIMEOUT" ? "Request Timeout" : err.code;
+        console.error(`❌ ${domain}: ${reason}`);
+        byDomain[domain] = [];
       }
     }
+  };
 
-    console.log("\nUnique IPs:");
-    Array.from(uniqueIps)
-      .sort()
-      .forEach((ip) => console.log(ip));
-  } catch (error) {
-    console.error("Error reading urls.txt:", error.message);
-  }
+  const workers = Array.from(
+    { length: Math.min(concurrency, list.length) },
+    worker,
+  );
+  await Promise.all(workers);
+
+  return {
+    byDomain,
+    allUniqueIps: Array.from(uniqueIps).sort(),
+  };
 }
 
-main();
+const domains = [
+  "google.com",
+  "yandex.ru",
+  "github.com",
+  "microsoft.com",
+  "youtube.com",
+];
+
+resolveWithPool(domains, 10).then(({ byDomain, allUniqueIps }) => {
+  console.log("\n📊 RESULTS BY DOMAIN:");
+  console.log(JSON.stringify(byDomain, null, 2));
+
+  console.log("\n🌐 UNIQUE IP ADDRESSES:");
+  console.log(allUniqueIps.join("\n"));
+});
+
+/*
+Что дальше:
+- Загрузка данных: Чтение списка доменов из текстового файла (.txt), где каждый домен с новой строки.
+- Сохранение: Автоматическая запись результатов в файл results.json.
+- Прогресс: Вывод в консоль строки вида Progress: 45/100 (45%), чтобы не смотреть в «пустой» экран при больших списках.
+*/
