@@ -7,6 +7,20 @@ const withTimeout = (promise, ms) => {
   return Promise.race([promise, timeout]);
 };
 
+const sortIps = (ips) => {
+  return ips.sort((a, b) => {
+    const octetsA = a.split(".").map(Number);
+    const octetsB = b.split(".").map(Number);
+
+    for (let i = 0; i < 4; i++) {
+      if (octetsA[i] !== octetsB[i]) {
+        return octetsA[i] - octetsB[i];
+      }
+    }
+    return 0;
+  });
+};
+
 async function resolveWithPool(list, concurrency = 20) {
   const byDomain = {};
   const uniqueIps = new Set();
@@ -37,7 +51,7 @@ async function resolveWithPool(list, concurrency = 20) {
 
   return {
     byDomain,
-    allUniqueIps: Array.from(uniqueIps).sort(),
+    allUniqueIps: sortIps(Array.from(uniqueIps)),
   };
 }
 
@@ -59,7 +73,6 @@ resolveWithPool(domains, 10).then(({ byDomain, allUniqueIps }) => {
 
 /*
 Что дальше:
-- Сортировка айпишников как наборов чисел 8.8.8.8, а не строк вида вида "8.8.8.8".
 - После вывода результатов скрипт висит еще какое-то время.
 - Загрузка данных: Чтение списка урлов из текстового файла (urls.txt), где каждый урл с новой строки.
 - Сохранение: Автоматическая запись результатов в файл ips.json в формате Amnezia.
