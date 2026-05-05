@@ -8,7 +8,7 @@ const withTimeout = (promise, ms) => {
 };
 
 const sortIps = (ips) => {
-  return ips.sort((a, b) => {
+  return [...ips].sort((a, b) => {
     const octetsA = a.split(".").map(Number);
     const octetsB = b.split(".").map(Number);
 
