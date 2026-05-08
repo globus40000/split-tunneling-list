@@ -1,17 +1,5 @@
 const dns = require("node:dns").promises;
 
-const withTimeout = (promise, ms) => {
-  let timeoutId;
-  const timeout = new Promise((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error("TIMEOUT")), ms);
-  });
-
-  return Promise.race([
-    promise.finally(() => clearTimeout(timeoutId)),
-    timeout,
-  ]);
-};
-
 const sortIps = (ips) => {
   return [...ips].sort((a, b) => {
     const octetsA = a.split(".").map(Number);
@@ -37,11 +25,14 @@ async function resolveWithPool(list, concurrency = 20) {
       if (!domain) continue;
 
       try {
-        const addresses = await withTimeout(dns.resolve4(domain), 5000);
+        const addresses = await dns.resolve4(domain, {
+          signal: AbortSignal.timeout(5000),
+        });
+
         byDomain[domain] = addresses;
         addresses.forEach((ip) => uniqueIps.add(ip));
       } catch (err) {
-        const reason = err.message === "TIMEOUT" ? "Request Timeout" : err.code;
+        const reason = err.name === "AbortError" ? "Request Timeout" : err.code;
         console.error(`❌ ${domain}: ${reason}`);
         byDomain[domain] = [];
       }
@@ -52,6 +43,7 @@ async function resolveWithPool(list, concurrency = 20) {
     { length: Math.min(concurrency, list.length) },
     worker,
   );
+
   await Promise.all(workers);
 
   return {
@@ -78,7 +70,6 @@ resolveWithPool(domains, 10).then(({ byDomain, allUniqueIps }) => {
 
 /*
 Что дальше:
-- После вывода результатов скрипт висит еще какое-то время.
 - Загрузка данных: Чтение списка урлов из текстового файла (urls.txt), где каждый урл с новой строки.
 - Сохранение: Автоматическая запись результатов в файл ips.json в формате Amnezia.
 */
