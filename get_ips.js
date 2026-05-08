@@ -1,10 +1,15 @@
 const dns = require("node:dns").promises;
 
 const withTimeout = (promise, ms) => {
-  const timeout = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error("TIMEOUT")), ms),
-  );
-  return Promise.race([promise, timeout]);
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error("TIMEOUT")), ms);
+  });
+
+  return Promise.race([
+    promise.finally(() => clearTimeout(timeoutId)),
+    timeout,
+  ]);
 };
 
 const sortIps = (ips) => {
