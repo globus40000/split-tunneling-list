@@ -14,14 +14,14 @@ const sortIps = (ips) => {
   });
 };
 
-async function resolveWithPool(list, concurrency = 20) {
+async function resolveWithPool(domains, concurrency = 20) {
   const byDomain = {};
   const uniqueIps = new Set();
   let currentIndex = 0;
 
   const worker = async () => {
-    while (currentIndex < list.length) {
-      const domain = list[currentIndex++];
+    while (currentIndex < domains.length) {
+      const domain = domains[currentIndex++];
       if (!domain) continue;
 
       try {
@@ -40,7 +40,7 @@ async function resolveWithPool(list, concurrency = 20) {
   };
 
   const workers = Array.from(
-    { length: Math.min(concurrency, list.length) },
+    { length: Math.min(concurrency, domains.length) },
     worker,
   );
 
