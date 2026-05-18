@@ -1,4 +1,21 @@
 const dns = require("node:dns").promises;
+const fs = require("node:fs").promises;
+
+async function getDomainsFromFile(filePath) {
+  try {
+    const content = await fs.readFile(filePath, "utf-8");
+
+    const domains = content
+      .split("\n")
+      .filter((line) => line.length > 0)
+      .map((line) => new URL(line).hostname);
+
+    return Array.from(new Set(domains));
+  } catch (err) {
+    console.error(`💥 Error reading file ${filePath}:`, err.message);
+    process.exit(1);
+  }
+}
 
 const sortIps = (ips) => {
   return [...ips].sort((a, b) => {
@@ -52,24 +69,32 @@ async function resolveWithPool(domains, concurrency = 20) {
   };
 }
 
-const domains = [
-  "google.com",
-  "yandex.ru",
-  "github.com",
-  "microsoft.com",
-  "youtube.com",
-];
+async function main() {
+  const filePath = "urls.txt";
+  console.log(`📖 Reading URLs from ${filePath}...`);
 
-resolveWithPool(domains, 10).then(({ byDomain, allUniqueIps }) => {
+  const domains = await getDomainsFromFile(filePath);
+  console.log(`🔍 Found ${domains.length} unique domains to check:`);
+  console.log(domains.map((d) => `  - ${d}`).join("\n"));
+
+  if (domains.length === 0) {
+    console.log("⚠️ File is empty or contains no valid URLs.");
+    return;
+  }
+
+  console.log(`\n🚀 Resolving IP addresses...`);
+  const { byDomain, allUniqueIps } = await resolveWithPool(domains, 10);
+
   console.log("\n📊 RESULTS BY DOMAIN:");
   console.log(JSON.stringify(byDomain, null, 2));
 
   console.log("\n🌐 UNIQUE IP ADDRESSES:");
   console.log(allUniqueIps.join("\n"));
-});
+}
+
+main();
 
 /*
 Что дальше:
-- Загрузка данных: Чтение списка урлов из текстового файла (urls.txt), где каждый урл с новой строки.
 - Сохранение: Автоматическая запись результатов в файл ips.json в формате Amnezia.
 */
