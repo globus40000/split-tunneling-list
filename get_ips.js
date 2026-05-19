@@ -69,8 +69,29 @@ async function resolveWithPool(domains, concurrency = 20) {
   };
 }
 
+async function saveToAmneziaFormat(ips, outputFilePath) {
+  const amneziaFormat = ips.map((ip) => ({
+    hostname: `${ip}/32`,
+    ip: "",
+  }));
+
+  try {
+    console.log(`\n💾 Saving Amnezia config to ${outputFilePath}...`);
+
+    const jsonString = JSON.stringify(amneziaFormat, null, 4);
+    const escapedJsonString = jsonString.replace(/\//g, "\\/");
+
+    await fs.writeFile(outputFilePath, escapedJsonString, "utf-8");
+    console.log("✅ File saved successfully!");
+  } catch (err) {
+    console.error(`💥 Error writing file ${outputFilePath}:`, err.message);
+  }
+}
+
 async function main() {
   const filePath = "urls.txt";
+  const outputFilePath = "ips.json";
+
   console.log(`📖 Reading URLs from ${filePath}...`);
 
   const domains = await getDomainsFromFile(filePath);
@@ -90,11 +111,8 @@ async function main() {
 
   console.log("\n🌐 UNIQUE IP ADDRESSES:");
   console.log(allUniqueIps.join("\n"));
+
+  await saveToAmneziaFormat(allUniqueIps, outputFilePath);
 }
 
 main();
-
-/*
-Что дальше:
-- Сохранение: Автоматическая запись результатов в файл ips.json в формате Amnezia.
-*/
