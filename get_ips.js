@@ -4,13 +4,20 @@ const fs = require("node:fs").promises;
 async function getDomainsFromFile(filePath) {
   try {
     const content = await fs.readFile(filePath, "utf-8");
+    const urls = content.split("\n");
+    const domains = new Set();
 
-    const domains = content
-      .split("\n")
-      .filter((line) => line.length > 0)
-      .map((line) => new URL(line).hostname);
+    for (const url of urls) {
+      if (url !== "") {
+        const { hostname } = new URL(url);
 
-    return Array.from(new Set(domains));
+        if (hostname) {
+          domains.add(hostname);
+        }
+      }
+    }
+
+    return Array.from(domains);
   } catch (err) {
     console.error(`💥 Error reading file ${filePath}:`, err.message);
     process.exit(1);
